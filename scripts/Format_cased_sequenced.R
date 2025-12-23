@@ -2,8 +2,8 @@
 #input_dir <- args[1]
 #output_dir <- args[2]
 
-input_dir <- "C:/ICB_Ascierto/data/input"
-output_dir <- "C:/ICB_Ascierto/data/output"
+input_dir <- "data/input"
+output_dir <- "data/output"
 
 clin = read.csv( file.path(input_dir, "CLIN.txt"), stringsAsFactors=FALSE , sep="\t" )
 rownames(clin) = clin$geo_accession
@@ -17,7 +17,6 @@ rownames(case) = patient
 case$snv = as.numeric( as.character( case$snv ) )
 case$cna = as.numeric( as.character( case$cna ) )
 case$expr = as.numeric( as.character( case$expr ) )
-
 
 write.table( case , file=file.path(output_dir, "cased_sequenced.csv") , quote=FALSE , sep=";" , col.names=TRUE , row.names=FALSE )
 
