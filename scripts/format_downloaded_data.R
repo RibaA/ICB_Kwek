@@ -19,36 +19,47 @@ write.table(clin, file=file.path(work_dir, 'CLIN.txt'), sep = "\t" , quote = FAL
 
 # EXP_TPM.tsv
 gset <- getGEO("GSE39688", GSEMatrix =TRUE)
-expr  <- exprs(eset)
-annot <- fData(eset)
+expr  <- exprs(gset$GSE39688_series_matrix.txt.gz)
+annot <- fData(gset$GSE39688_series_matrix.txt.gz)
 
 stopifnot(nrow(expr) == nrow(annot))  # should be TRUE
 
-# Clean accessions
-refseq <- sub("\\..*$", "", annot$GB_ACC)
-refseq <- trimws(refseq)
-refseq[refseq == ""] <- NA
+acc <- sub("\\..*$", "", trimws(annot$GB_ACC))
+acc[acc == ""] <- NA
 
-# Only map RefSeq-like IDs; keep full length vector
-is_refseq <- !is.na(refseq) & grepl("^(NM|NR|XM|XR)_", refseq)
+# 1) Try REFSEQ for NM_/NR_/XM_/XR_
+is_refseq <- !is.na(acc) & grepl("^(NM|NR|XM|XR)_", acc)
+keys_ref  <- unique(acc[is_refseq])
 
-# Map unique keys once
-keys_use <- unique(refseq[is_refseq])
-
-symbol_by_refseq <- AnnotationDbi::mapIds(
-  x = org.Hs.eg.db,
-  keys = keys_use,
+sym_ref <- mapIds(
+  org.Hs.eg.db,
+  keys = keys_ref,
   keytype = "REFSEQ",
   column = "SYMBOL",
   multiVals = "first"
 )
 
-# Build row-aligned symbol vector (length == nrow(expr))
-symbol_map <- rep(NA_character_, nrow(expr))
-symbol_map[is_refseq] <- unname(symbol_by_refseq[refseq[is_refseq]])
+symbol_map <- rep(NA_character_, length(acc))
+symbol_map[is_refseq] <- unname(sym_ref[acc[is_refseq]])
 
-length(symbol_map) == nrow(expr)  # should be TRUE
+# 2) Fill remaining using ACCNUM (covers many BC*/AK*/etc)
+need <- is.na(symbol_map) & !is.na(acc)
+keys_acc <- unique(acc[need])
+
+sym_acc <- mapIds(
+  org.Hs.eg.db,
+  keys = keys_acc,
+  keytype = "ACCNUM",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+symbol_map[need] <- unname(sym_acc[acc[need]])
+
+# Check how many still NA
 rownames(expr) <- symbol_map
+expr <- expr[!is.na(rownames(expr)), ]
+rownames(expr) <- make.unique(rownames(expr))
 expr <- expr[, order(colnames(expr))]
 
 write.table(expr, file=file.path(work_dir, 'EXP_TPM.tsv'), sep = "\t" , quote = FALSE , row.names = TRUE, col.names=TRUE)
